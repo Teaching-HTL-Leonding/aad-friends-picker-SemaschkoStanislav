@@ -1,59 +1,48 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.Identity.Web;
+using System.Security.Claims;
 
-namespace aad_friends_picker_SemaschkoStanislav
+namespace ProtectedApi
 {
-    public class Startup
+    public record Startup(IConfiguration Configuration)
     {
-        public Startup(IConfiguration configuration)
-        {
-            Configuration = configuration;
-        }
-
-        public IConfiguration Configuration { get; }
-
-        // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            // Add web API authentication to dependency injection.
+            // Note that you need to add Microsoft.Identity.Web NuGet to your
+            // ASP.NET Core 5 app to make that work. Docs see
+            // https://docs.microsoft.com/en-us/dotnet/api/microsoft.identity.web.microsoftidentitywebappservicecollectionextensions.addmicrosoftidentitywebappauthentication
+            services.AddMicrosoftIdentityWebApiAuthentication(Configuration);
+
+            services.AddCors();
+
+            // Don't forget to add authentication and authorization to DI.
+            services.AddAuthentication();
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("RainerOnly", policy => policy.RequireClaim(ClaimTypes.Name, "r.stropek@HTBLALeonding.onmicrosoft.com"));
+            });
 
             services.AddControllers();
-            services.AddSwaggerGen(c =>
-            {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "aad_friends_picker_SemaschkoStanislav", Version = "v1" });
-            });
         }
 
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "aad_friends_picker_SemaschkoStanislav v1"));
-            }
+            if (env.IsDevelopment()) app.UseDeveloperExceptionPage();
 
+            app.UseCors(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
             app.UseHttpsRedirection();
-
             app.UseRouting();
 
+            // Add authentication and authorization middleware.
+            app.UseAuthentication();
             app.UseAuthorization();
 
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapControllers();
-            });
+            app.UseEndpoints(endpoints => endpoints.MapControllers());
         }
     }
 }
